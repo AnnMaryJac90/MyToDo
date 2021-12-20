@@ -10,28 +10,17 @@ import CoreData
 
 class ToDoViewController: UITableViewController {
     
- 
     var myList = [Item]()
-//    var item1 = Item()
-//    var item2 = Item()
-//    var item3 = Item()
-   
+
     let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
 
     override func viewDidLoad() {
         super.viewDidLoad()
-//        item1.title = "Buy groceries"
-//        item2.title = "GO to Library"
-//        item3.title = "pay bill"
-//        myList = [item1,item2,item3]
-//
         loadData()
-      print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
     }
 
     
 }
-
 
 //MARK: - Tableview Data Source
 
@@ -51,8 +40,6 @@ extension ToDoViewController {
     }
     
     
-    //MARK: - delgate methods
-    
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
      
@@ -60,14 +47,14 @@ extension ToDoViewController {
         myList[indexPath.row].done = !myList[indexPath.row].done
     
         saveData()
-        tableView.reloadData()
+      
         
     }
     
-    
+}
     //MARK: - Adding an item to list
     
-    
+extension ToDoViewController {
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
         
         var textfield = UITextField()
@@ -100,28 +87,31 @@ extension ToDoViewController {
         
         
     }
-    
-    
+}
+
+//MARK: - Saving to db
+
+extension ToDoViewController {
     
     func saveData(){
-      
         do {
-            
-         
-           
             try context.save()
-        }
+           }
         catch {
             print(error)
         }
-     
         self.tableView.reloadData()
     }
     
+}
+
+
+//MARK: - Loading from db
+
+extension ToDoViewController {
     
-    
-    func loadData() {
-        let request : NSFetchRequest<Item> = Item.fetchRequest()
+    func loadData(with request:NSFetchRequest<Item> = Item.fetchRequest()) {
+       
         do {
         myList = try context.fetch(request)
         
@@ -129,6 +119,38 @@ extension ToDoViewController {
         catch{
             print("eroor while fetching data from db \(error)")
         }
+        tableView.reloadData()
 }
+   
+
+}
+
+
+//MARK: - Search bar funcionalities
+
+extension ToDoViewController : UISearchBarDelegate
+{
+    
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+       
+        let request : NSFetchRequest<Item> = Item.fetchRequest()
+        request.predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+      
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        
+       loadData(with: request)
+        
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchBar.text?.count == 0 {
+            loadData()
+            DispatchQueue.main.async {
+                searchBar.resignFirstResponder()
+            }
+           
+        }
+    }
+    
 
 }
