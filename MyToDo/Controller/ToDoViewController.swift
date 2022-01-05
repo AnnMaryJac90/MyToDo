@@ -7,16 +7,27 @@
 
 import UIKit
 import CoreData
+import RealmSwift
 
 class ToDoViewController: UITableViewController {
+    let realm = try! Realm()
+    var myList = ["cookie","santa"]
+    var selectedCategory : Category?{
+        didSet{
+        loadData()
+        }
+    }
     
-    var myList = [Item]()
+    
+    
+    
+    var itemList : Results<Item>?
 
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+  //  let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        loadData()
+     
     }
 
     
@@ -27,15 +38,13 @@ class ToDoViewController: UITableViewController {
 extension ToDoViewController {
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-      
-        return myList.count
+        print("itemList count is: \(itemList!.count)")
+       return itemList?.count ?? 1
     }
-    
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: K.cellIdentifier, for: indexPath)
-        cell.textLabel?.text = myList[indexPath.row].title
-        cell.accessoryType =  myList[indexPath.row].done ? .checkmark : .none
-       
+        cell.textLabel?.text = itemList?[indexPath.row].title ?? "No item added yet"
+        cell.accessoryType = itemList![indexPath.row].done ? .checkmark : .none
         return cell
     }
     
@@ -43,11 +52,21 @@ extension ToDoViewController {
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
      
-        tableView.deselectRow(at: indexPath, animated: true)
-        myList[indexPath.row].done = !myList[indexPath.row].done
+      //  tableView.deselectRow(at: indexPath, animated: true)
+        if let item = itemList?[indexPath.row] {
+            do {
+                try realm.write{
+                    realm.delete(item)
+                }
+            }
+            catch {
+                print(error)
+            }
+        }
+       
+        tableView.reloadData()
     
-        saveData()
-      
+       
         
     }
     
@@ -58,70 +77,62 @@ extension ToDoViewController {
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
         
         var textfield = UITextField()
-       
         let alert = UIAlertController(title: "Add an Item", message: "Enter the activity", preferredStyle: .alert)
-        
         alert.addTextField { alerttextfield in
             alerttextfield.placeholder = "add an item"
             textfield = alerttextfield
-            print("added item is \(alerttextfield)")
+           
            
         }
         
         
         let action = UIAlertAction(title: "Save", style: .default) {  (action) in
             
-            let item = Item(context: self.context)
-            item.title = textfield.text!
-            item.done = false
-            self.myList.append(item)
             
-            self.saveData()
-          
+            if let currentCategory = self.selectedCategory {
+                do{
+                   try self.realm.write {
+                let item = Item()
+                       
+                item.title = textfield.text!
+                item.dateCreated = Date()
+                currentCategory.items.append(item)
+                       self.realm.add(item)
+            }
+           
+                }
+        
+                   
+                   
+        catch{
+                print(error)
+            }
+                self.tableView.reloadData()
+
           
         }
-      
+        }
         
         alert.addAction(action)
         self.present(alert, animated: true, completion: nil)
         
         
     }
-}
-
-//MARK: - Saving to db
-
-extension ToDoViewController {
-    
-    func saveData(){
-        do {
-            try context.save()
-           }
-        catch {
-            print(error)
-        }
-        self.tableView.reloadData()
     }
-    
-}
+
 
 
 //MARK: - Loading from db
 
 extension ToDoViewController {
     
-    func loadData(with request:NSFetchRequest<Item> = Item.fetchRequest()) {
-       
-        do {
-        myList = try context.fetch(request)
-        
-    }
-        catch{
-            print("eroor while fetching data from db \(error)")
-        }
+    func loadData() {
+        itemList = selectedCategory?.items.sorted(byKeyPath: "dateCreated", ascending: true)
         tableView.reloadData()
+       
+        
 }
-   
+
 
 }
 
@@ -132,25 +143,23 @@ extension ToDoViewController : UISearchBarDelegate
 {
     
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        
+        itemList = itemList?.filter("title CONTAINS[cd] %@", searchBar.text).sorted(byKeyPath: "dateCreated", ascending: true)
+        tableView.reloadData()
        
-        let request : NSFetchRequest<Item> = Item.fetchRequest()
-        request.predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
-      
-        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
-        
-       loadData(with: request)
-        
+
     }
     
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         if searchBar.text?.count == 0 {
-            loadData()
-            DispatchQueue.main.async {
-                searchBar.resignFirstResponder()
+            
+            itemList = selectedCategory?.items.sorted(byKeyPath: "dateCreated", ascending: true)
+            tableView.reloadData()
+
             }
            
         }
     }
     
 
-}
+

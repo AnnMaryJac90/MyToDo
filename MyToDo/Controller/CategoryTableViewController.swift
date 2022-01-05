@@ -6,14 +6,14 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 
 
 class CategoryTableViewController: UITableViewController {
 
-    
-     var categoryList = [Category]()
+    let realm = try! Realm()
+    var categoryList : Results<Category>?
     let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -24,22 +24,28 @@ class CategoryTableViewController: UITableViewController {
     
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return categoryList.count
+        return categoryList?.count ?? 1
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .default, reuseIdentifier: "categoryCell")
-        cell.textLabel?.text = categoryList[indexPath.row].name
+        cell.textLabel?.text = categoryList?[indexPath.row].name ?? "No category added yet"
+       
         return cell
     }
     
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
-        
+        performSegue(withIdentifier: "toItems" , sender: self)
     }
 
-    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        var destinationVC = segue.destination as! ToDoViewController
+        if let indexPath = tableView.indexPathForSelectedRow{
+            destinationVC.selectedCategory = categoryList?[indexPath.row]
+    }
+    }
     
 }
 
@@ -56,11 +62,10 @@ extension CategoryTableViewController{
         }
         
         let action = UIAlertAction(title: "ADD", style: .default) { (action) in
-            let category = Category(context: self.context)
-            print("cateogy is \(textField.text)")
-            category.name = textField.text
-            self.categoryList.append(category)
-            self.saveData()
+            let category = Category()
+            category.name = textField.text!
+           
+            self.saveData(with: category)
         }
         
         alert.addAction(action)
@@ -75,15 +80,16 @@ extension CategoryTableViewController{
 //MARK: - saving to db
 
 extension CategoryTableViewController{
-    func saveData()
+    func saveData(with category:Category)
     {
-        do{
-            try context.save()
+        do {
+         try realm.write {
+            realm.add(category)
         }
-        catch{
-            print("error while saving data")
         }
-        
+        catch {
+            print(error)
+        }
         tableView.reloadData()
         
         
@@ -96,13 +102,8 @@ extension CategoryTableViewController{
 
 extension CategoryTableViewController{
     func loadData(){
-        let request : NSFetchRequest<Category> = Category.fetchRequest()
-        do {
-            try categoryList = context.fetch(request)
         
-    }
-        catch {
-            print("error loading data from db")
-        }
+        categoryList = realm.objects(Category.self)
+       
 }
 }
